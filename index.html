@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Pariwisata Bali</title>
+
+    <!-- 🌈 Tailwind & Chart.js -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- 🌍 Data hasil export dari QGIS -->
+    <script src="map/data/Bali_1.js"></script>
+    <script src="map/data/Kepadatan_Wisatawan_2.js"></script>
+    <script src="map/data/PEMUKIMAN_BALI_3.js"></script>
+    <script src="map/data/Titik_Wisata_4.js"></script>
+
+    <style>
+      body {
+        background-color: #fff2f2;
+        font-family: "Inter", sans-serif;
+      }
+      iframe {
+        border: none;
+        border-radius: 10px;
+      }
+      .scrollable-sidebar {
+        height: calc(100vh - 160px);
+        overflow-y: auto;
+      }
+      .fixed-map {
+        position: sticky;
+        top: 0;
+      }
+      @keyframes marquee {
+        0% {
+          transform: translateX(100%);
+        }
+        100% {
+          transform: translateX(-100%);
+        }
+      }
+      .animate-marquee {
+        display: inline-block;
+        animation: marquee 20s linear infinite;
+      }
+    </style>
+  </head>
+
+  <body class="p-6 flex flex-col min-h-screen">
+    <!-- 🏝️ HEADER -->
+    <h1
+      class="relative text-5xl font-extrabold text-center text-[#FFF2F2] py-8 rounded-lg shadow-lg mb-6 overflow-hidden bg-[#2D336B]"
+    >
+      <div class="absolute inset-0 bg-[#2D336B] bg-opacity-90"></div>
+      <span class="relative z-10">Geografis Pariwisata di Pulau Bali</span>
+    </h1>
+
+    <!-- 🔁 Running text -->
+    <div class="mb-6">
+      <div
+        class="relative overflow-hidden bg-[#A9B5DF] bg-opacity-30 border border-[#A9B5DF] rounded-md py-3"
+      >
+        <div
+          class="animate-marquee whitespace-nowrap text-[#2D336B] font-medium"
+        >
+          🌴 Selamat datang di Dashboard Geografis Pariwisata Bali — Data
+          otomatis dari WebGIS (QGIS) 🌺
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== KONTEN UTAMA ======================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
+      <!-- 🗺️ PETA -->
+      <div
+        class="lg:col-span-2 bg-white rounded-lg shadow-md p-3 border border-[#A9B5DF] fixed-map"
+      >
+        <h2 class="bg-[#7886C7] text-white font-semibold rounded-md p-2">
+          Peta Sebaran Pariwisata
+        </h2>
+        <iframe
+          src="map/index.html"
+          class="w-full h-[80vh]"
+          id="petaFrame"
+        ></iframe>
+      </div>
+
+      <!-- 📊 SIDEBAR -->
+      <div class="space-y-5 scrollable-sidebar">
+        <!-- 📊 Grafik 1 -->
+        <div class="bg-white rounded-lg shadow-md p-4 border border-[#A9B5DF]">
+          <div class="flex justify-between items-center">
+            <h2 class="bg-[#7886C7] text-white font-semibold rounded-md p-2">
+              Jumlah Objek Wisata per Kabupaten
+            </h2>
+            <!-- <span id="debugSummary" class="text-xs text-gray-700 border px-2 py-1 rounded bg-gray-100">Debug</span> -->
+          </div>
+          <canvas id="chartTotal" class="w-full h-64"></canvas>
+        </div>
+
+        <!-- 📈 Grafik 2 -->
+        <div class="bg-white rounded-lg shadow-md p-4 border border-[#A9B5DF]">
+          <h2 class="bg-[#7886C7] text-white font-semibold rounded-md p-2">
+            Jumlah Wisatawan per Daerah (2025)
+          </h2>
+          <canvas id="chartTrend" class="w-full h-72"></canvas>
+        </div>
+
+        <!-- 🥇 Grafik 3 -->
+        <div class="bg-white rounded-lg shadow-md p-4 border border-[#A9B5DF]">
+          <div class="flex justify-between items-center">
+            <h2 class="bg-[#7886C7] text-white font-semibold rounded-md p-2">
+              Kabupaten Terbanyak / Terkecil
+            </h2>
+            <select id="filterTop3" class="border rounded px-2 py-1 text-sm">
+              <option value="terbanyak">3 Terbanyak</option>
+              <option value="terkecil">3 Terkecil</option>
+            </select>
+          </div>
+          <canvas id="chartTop3" class="w-full h-64 mt-3"></canvas>
+        </div>
+
+        <!-- 🧩 Grafik 4 -->
+        <div class="bg-white rounded-lg shadow-md p-4 border border-[#A9B5DF]">
+          <h2 class="bg-[#7886C7] text-white font-semibold rounded-md p-2">
+            Komposisi Jenis Wisata per Kabupaten
+          </h2>
+          <select
+            id="kabupatenSelect"
+            class="border rounded p-1 mb-3 w-full"
+          ></select>
+          <div class="flex justify-center items-center py-4">
+            <div class="w-64 h-64">
+              <canvas id="chartJenis"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== TABEL DATA ======================== -->
+    <div class="bg-white rounded-lg shadow-md p-4 mt-6 border border-[#A9B5DF]">
+      <h2 class="bg-[#7886C7] text-white font-semibold rounded-md p-2 mb-3">
+        Data Objek Wisata Bali
+      </h2>
+
+      <!-- Filter -->
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <div>
+          <label class="font-medium text-[#2D336B]">Kategori:</label>
+          <select id="kategoriFilter" class="border rounded px-3 py-1"></select>
+        </div>
+        <div>
+          <label class="font-medium text-[#2D336B]">Subkategori:</label>
+          <select id="subFilter" class="border rounded px-3 py-1">
+            <option value="all">Semua</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2 ml-auto">
+          <label class="font-medium text-[#2D336B]">Cari:</label>
+          <input
+            id="searchWisata"
+            type="text"
+            placeholder="Cari nama objek..."
+            class="border rounded px-3 py-1 w-56"
+          />
+        </div>
+      </div>
+
+      <!-- Tabel -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-[#2D336B] border rounded">
+          <thead class="bg-[#A9B5DF] bg-opacity-40 font-semibold">
+            <tr>
+              <th class="border p-2 text-left">Nama Objek</th>
+              <th class="border p-2 text-left">Jenis Wisata</th>
+              <th class="border p-2 text-left">Kabupaten</th>
+              <th class="border p-2 text-left">Alamat</th>
+              <th class="border p-2 text-left">Deskripsi</th>
+            </tr>
+          </thead>
+          <tbody id="tabelWisata" class="bg-white"></tbody>
+        </table>
+      </div>
+
+      <!-- Lihat lebih banyak -->
+      <div class="text-center mt-3">
+        <button
+          id="lihatLebihBtn"
+          class="bg-[#7886C7] hover:bg-[#2D336B] text-white px-4 py-2 rounded-lg"
+        >
+          Lihat Lebih Banyak
+        </button>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer
+      class="mt-8 bg-[#2D336B] text-[#FFF2F2] text-center py-6 rounded-lg shadow-inner"
+    >
+      <p class="text-sm">&copy; 2025 Team Projek Akhir</p>
+    </footer>
+
+    <!-- ======================== SCRIPT UTAMA ======================== -->
+    <script>
+      /* ============================================================
+        🔧 BAGIAN 1: Parse data QGIS & deteksi kabupaten otomatis
+      ============================================================ */
+      const norm = (s) =>
+        String(s || "")
+          .toLowerCase()
+          .replace(/[^\w\s]/g, "")
+          .trim();
+      const get = (o, k) =>
+        k.map((x) => o[x]).find((v) => v && String(v).trim() !== "");
+      const kabPolys = (json_Bali_1.features || []).map((f) => ({
+        name: f.properties.NAME_2,
+        geom: f.geometry,
+      }));
+
+      function inPoly([x, y], poly) {
+        let c = false;
+        const pts = poly.coordinates[0];
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+          const xi = pts[i][0],
+            yi = pts[i][1],
+            xj = pts[j][0],
+            yj = pts[j][1];
+          const inter =
+            yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+          if (inter) c = !c;
+        }
+        return c;
+      }
+      function kabFromCoord(x, y) {
+        for (const k of kabPolys) {
+          if (k.geom.type === "Polygon" && inPoly([x, y], k.geom))
+            return k.name;
+          if (k.geom.type === "MultiPolygon")
+            for (const p of k.geom.coordinates)
+              if (inPoly([x, y], { coordinates: p })) return k.name;
+        }
+        return null;
+      }
+
+      const features = json_Titik_Wisata_4.features || [];
+      const parsed = [];
+      let miss = 0;
+
+      for (const f of features) {
+        const p = f.properties || {};
+        const nama = get(p, ["nama_objek", "namaobjek"]);
+        const jenis = get(p, ["jenis_obje", "jenisobjek"]);
+        const alamat = get(p, ["alamat"]);
+        let kab = get(p, ["KABUPATEN", "Kabupaten", "KAB", "KOTA"]);
+        if (!kab) {
+          const txt = (alamat || "") + " " + (nama || "");
+          for (const k of kabPolys.map((k) => k.name))
+            if (norm(txt).includes(norm(k))) {
+              kab = k;
+              break;
+            }
+        }
+        if (!kab && f.geometry?.coordinates) {
+          const [x, y] = f.geometry.coordinates;
+          kab = kabFromCoord(x, y);
+        }
+        if (!kab) miss++;
+        parsed.push({
+          nama,
+          jenis,
+          kab: kab || "Tidak Diketahui",
+          alamat,
+          desc: p.deskripsi || "",
+          coord: f.geometry?.coordinates || null,
+        });
+      }
+
+      /* ============================================================
+        📊 BAGIAN 2: Grafik - Jumlah Wisata per Kabupaten
+      ============================================================ */
+      const countKab = {};
+      parsed.forEach((p) => (countKab[p.kab] = (countKab[p.kab] || 0) + 1));
+      new Chart(document.getElementById("chartTotal"), {
+        type: "bar",
+        data: {
+          labels: Object.keys(countKab),
+          datasets: [
+            { data: Object.values(countKab), backgroundColor: "#7886C7" },
+          ],
+        },
+        options: { plugins: { legend: { display: false } } },
+      });
+
+      /* ============================================================
+        📈 BAGIAN 3: Grafik - Wisatawan per Daerah
+      ============================================================ */
+      const wisPerKab = {};
+      (json_Kepadatan_Wisatawan_2.features || []).forEach((f) => {
+        const n = f.properties["Kabupaten/Kota"];
+        const j = f.properties["Jumlah Wisatawan"];
+        wisPerKab[n] = j;
+      });
+      new Chart(document.getElementById("chartTrend"), {
+        type: "line",
+        data: {
+          labels: Object.keys(wisPerKab),
+          datasets: [
+            {
+              label: "Jumlah Wisatawan",
+              data: Object.values(wisPerKab),
+              borderColor: "#2D336B",
+              backgroundColor: "#A9B5DF",
+            },
+          ],
+        },
+      });
+
+      /* ============================================================
+        🥇 BAGIAN 4: Grafik - Top 3 Kabupaten
+      ============================================================ */
+      const sorted = Object.entries(countKab).sort((a, b) => b[1] - a[1]);
+      const ctxTop3 = document.getElementById("chartTop3");
+      let chartTop3 = new Chart(ctxTop3, {
+        type: "bar",
+        data: {
+          labels: sorted.slice(0, 3).map((d) => d[0]),
+          datasets: [
+            {
+              data: sorted.slice(0, 3).map((d) => d[1]),
+              backgroundColor: "#7886C7",
+            },
+          ],
+        },
+      });
+      document.getElementById("filterTop3").addEventListener("change", (e) => {
+        const v = e.target.value;
+        const d = v === "terkecil" ? sorted.slice(-3) : sorted.slice(0, 3);
+        chartTop3.data.labels = d.map((x) => x[0]);
+        chartTop3.data.datasets[0].data = d.map((x) => x[1]);
+        chartTop3.update();
+      });
+
+      /* ============================================================
+        🧩 BAGIAN 5: Grafik Pie - Komposisi Jenis Wisata
+      ============================================================ */
+      const sel = document.getElementById("kabupatenSelect");
+      Object.keys(countKab).forEach(
+        (k) => (sel.innerHTML += `<option value="${k}">${k}</option>`)
+      );
+      const ctxJenis = document.getElementById("chartJenis");
+      let chartJenis = null;
+      function renderPie(kabupaten) {
+        const jCount = {};
+        parsed
+          .filter((p) => p.kab === kabupaten)
+          .forEach((p) => (jCount[p.jenis] = (jCount[p.jenis] || 0) + 1));
+        if (chartJenis) chartJenis.destroy();
+        chartJenis = new Chart(ctxJenis, {
+          type: "doughnut",
+          data: {
+            labels: Object.keys(jCount),
+            datasets: [
+              {
+                data: Object.values(jCount),
+                backgroundColor: [
+                  "#A9B5DF",
+                  "#7886C7",
+                  "#2D336B",
+                  "#D9E0FF",
+                  "#FFE8E8",
+                  "#B0C4DE",
+                  "#F2B5D4",
+                  "#FAD6A5",
+                ],
+              },
+            ],
+          },
+          options: {
+            cutout: "70%",
+            plugins: { legend: { position: "bottom" } },
+          },
+        });
+      }
+      renderPie(Object.keys(countKab)[0]);
+      sel.value = Object.keys(countKab)[0];
+      sel.addEventListener("change", () => renderPie(sel.value));
+
+      /* ============================================================
+        📋 BAGIAN 6: Tabel + Filter + Klik interaktif ke peta
+      ============================================================ */
+      function detectKategori(jenis) {
+        const s = (jenis || "").toLowerCase();
+        if (
+          s.includes("bukit") ||
+          s.includes("gunung") ||
+          s.includes("taman") ||
+          s.includes("rekreasi") ||
+          s.includes("pemandian") ||
+          s.includes("goa") ||
+          s.includes("gua") ||
+          s.includes("lapangan") ||
+          s.includes("golf") ||
+          s.includes("kerajinan") ||
+          s.includes("camping") ||
+          s.includes("hutan")
+        )
+          return "Wisata Daratan";
+        if (
+          s.includes("air terjun") ||
+          s.includes("curug") ||
+          s.includes("pantai") ||
+          s.includes("danau") ||
+          s.includes("laut") ||
+          s.includes("sungai") ||
+          s.includes("kolam") ||
+          s.includes("pemandian air panas")
+        )
+          return "Wisata Air";
+        if (
+          s.includes("pura") ||
+          s.includes("candi") ||
+          s.includes("gereja") ||
+          s.includes("masjid") ||
+          s.includes("vihara") ||
+          s.includes("klenteng")
+        )
+          return "Wisata Religius";
+        if (
+          s.includes("museum") ||
+          s.includes("monumen") ||
+          s.includes("desa") ||
+          s.includes("adat") ||
+          s.includes("budaya") ||
+          s.includes("seni") ||
+          s.includes("galeri") ||
+          s.includes("festival") ||
+          s.includes("tari") ||
+          s.includes("sanggar")
+        )
+          return "Budaya & Seni";
+        return "Lainnya";
+      }
+
+      const kategoriData = {
+        "Wisata Daratan": new Set(),
+        "Wisata Air": new Set(),
+        "Wisata Religius": new Set(),
+        "Budaya & Seni": new Set(),
+        Lainnya: new Set(),
+      };
+      parsed.forEach((p) => {
+        const k = detectKategori(p.jenis);
+        kategoriData[k].add(p.jenis);
+      });
+      const katSel = document.getElementById("kategoriFilter");
+      const subSel = document.getElementById("subFilter");
+      katSel.innerHTML = '<option value="all">Semua</option>';
+      Object.keys(kategoriData).forEach(
+        (k) => (katSel.innerHTML += `<option value="${k}">${k}</option>`)
+      );
+      katSel.addEventListener("change", () => {
+        subSel.innerHTML = '<option value="all">Semua</option>';
+        if (kategoriData[katSel.value])
+          kategoriData[katSel.value].forEach(
+            (s) => (subSel.innerHTML += `<option value="${s}">${s}</option>`)
+          );
+        render();
+      });
+
+      const tbody = document.getElementById("tabelWisata");
+      const search = document.getElementById("searchWisata");
+      const more = document.getElementById("lihatLebihBtn");
+      let showAll = false;
+
+      function render() {
+        tbody.innerHTML = "";
+        let data = parsed.slice();
+        if (katSel.value !== "all")
+          data = data.filter((p) => detectKategori(p.jenis) === katSel.value);
+        if (subSel.value !== "all")
+          data = data.filter((p) => p.jenis === subSel.value);
+        const q = norm(search.value);
+        if (q) data = data.filter((p) => norm(p.nama).includes(q));
+
+        data.forEach((p, i) => {
+          if (!showAll && i >= 10) return;
+          const coord = p.coord ? JSON.stringify(p.coord) : "null";
+          tbody.innerHTML += `
+            <tr class="hover:bg-[#A9B5DF]/20 cursor-pointer"
+                data-coord='${coord}'
+                title="Klik untuk lihat di peta">
+              <td class="border p-2 font-medium">${p.nama || "-"}</td>
+              <td class="border p-2">${p.jenis || "-"}</td>
+              <td class="border p-2">${p.kab || "-"}</td>
+              <td class="border p-2">${p.alamat || "-"}</td>
+              <td class="border p-2">${p.desc || "-"}</td>
+            </tr>`;
+        });
+
+        more.textContent = showAll
+          ? "Tampilkan Lebih Sedikit"
+          : `Lihat Lebih Banyak (${Math.max(0, data.length - 10)})`;
+
+        // Klik baris → zoom ke peta
+        document.querySelectorAll("#tabelWisata tr").forEach((tr) => {
+          tr.addEventListener("click", () => {
+            const coord = JSON.parse(tr.dataset.coord);
+            if (coord) {
+              const iframe = document.getElementById("petaFrame");
+              iframe.contentWindow.postMessage(
+                { type: "zoomTo", coord: coord },
+                "*"
+              );
+            }
+          });
+        });
+      }
+
+      render();
+      more.addEventListener("click", () => {
+        showAll = !showAll;
+        render();
+      });
+      search.addEventListener("input", render);
+      subSel.addEventListener("change", render);
+    </script>
+  </body>
+</html>
